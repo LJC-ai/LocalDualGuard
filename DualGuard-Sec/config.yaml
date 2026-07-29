@@ -1,0 +1,151 @@
+# =============================================================================
+# DualGuard-Sec 配置文件（安全版）
+# -----------------------------------------------------------------------------
+# 本文件由 common/config 加载，与 common/risk_engine、common/audit_hash 协同。
+# 仅当 audit_policy.json 的 SHA256 与 audit_policy.sha256 一致时，本配置才生效；
+# 若不一致，程序将自动从 backup/ 恢复策略并触发"篡改程序警告"弹窗。
+# 修改后请同步重算 audit_policy.sha256，否则会被判为篡改。
+# =============================================================================
+
+app:
+  name: "DualGuard-Sec"
+  edition: "sec"              # 必须为 sec，对应 AppPaths("sec")，勿改
+  version: "1.0.0"
+  display_name: "DualGuard 安全版合规护栏"
+  vendor: "DualGuard Contributors"
+  # 单例锁，防止多实例同时写 violations.enc
+  single_instance: true
+  # 托盘 / 服务运行模式：tray | service
+  run_mode: "tray"
+
+# -----------------------------------------------------------------------------
+# 风控引擎参数（common/risk_engine）
+# -----------------------------------------------------------------------------
+risk_engine:
+  # 违规计数阈值：累计达到 freeze_threshold 次即触发 72h 冻结
+  freeze_threshold: 3
+  # 冻结时长（小时）。paths.py 中 lock.state 记录冻结起始时间
+  freeze_hours: 72
+  # 单调计数器文件，防系统时间回拨绕过
+  monotonic_counter: true
+  # 单次违规后是否弹窗（false 时仅计数不弹窗）
+  warn_on_single: true
+  # 首次违规与再次违规的计数权重（sec 版默认等权）
+  weights:
+    first: 1
+    repeat: 1
+
+# -----------------------------------------------------------------------------
+# 审核策略与哈希校验（common/audit_hash）
+# -----------------------------------------------------------------------------
+audit:
+  # 审核策略文件相对 data_dir 的路径
+  policy_file: "audit_policy.json"
+  backup_file: "backup/audit_policy.json.bak"
+  hash_file: "audit_policy.sha256"
+  # 哈希算法：sha256 | sha512
+  algorithm: "sha256"
+  # 检测到篡改时：restore = 从备份恢复并继续；halt = 恢复后冻结并退出
+  on_tamper: "restore"
+  # 启动时强制校验
+  verify_on_start: true
+
+# -----------------------------------------------------------------------------
+# 加密存储（common/audit_storage）
+# -----------------------------------------------------------------------------
+storage:
+  # 违规记录文件
+  db_file: "violations.enc"
+  # 主密钥文件（仅存 KEK）
+  kek_file: "kek.bin"
+  cipher: "aes-256-gcm"
+  kdf: "argon2id"
+  # KEK 派生迭代参数
+  kdf_iterations: 64
+
+# -----------------------------------------------------------------------------
+# 前置审核 AI（common/pre_audit 可插拔接口）
+# -----------------------------------------------------------------------------
+pre_audit:
+  enabled: true
+  # 插件模块路径，赛事方可注入自定义规则引擎
+  module: "dualguard_sec.rules"
+  # 超时（毫秒），超时按"放行 + 记录"处理，避免误伤正常操作
+  timeout_ms: 500
+  # ⚠️ 合规约束：AI 仅用于合规判定与拦截，禁止用于生成攻击代码
+  policy_mode: "judge_only"   # judge_only | generate（generate 在安全版被强制禁用）
+
+# -----------------------------------------------------------------------------
+# 日志（common/paths.py → log_dir）
+# -----------------------------------------------------------------------------
+logging:
+  level: "INFO"
+  rotate_mb: 10
+  keep: 7
+  # 日志脱敏：违规详情中的敏感参数在落盘前掩码
+  redact: true
+
+# -----------------------------------------------------------------------------
+# 合规横幅（启动时与关于页常驻显示，不可关闭）
+# -----------------------------------------------------------------------------
+compliance_banner:
+  enabled: true
+  text: "本程序仅供已授权封闭靶场内合规监护使用。严禁在公共机场/公用网络开展未经授权渗透；严禁生成恶意攻击代码。"
+
+# =============================================================================
+# 前端弹窗提示文案
+# -----------------------------------------------------------------------------
+# 三类弹窗：single_violation（单次违规警告）/ freeze（冻结提示）/ tamper（篡改程序警告）
+# title   弹窗标题
+# body    正文（支持占位符 {count} {threshold} {remain_hours} {file}）
+# level   info | warn | critical（决定图标与颜色）
+# buttons 按钮列表，action: dismiss(关闭) | ack(确认并记录) | unlock(仅管理员可触发)
+# =============================================================================
+popups:
+  # ---- 单次违规警告 ----
+  single_violation:
+    title: "⚠️ 违规操作已记录"
+    level: "warn"
+    body: |
+      检测到一次违规操作，已计入本机违规计数。
+      当前累计违规：{count} / {threshold} 次。
+      请立即停止越界行为，回到授权靶场范围内操作。
+      累计达到 {threshold} 次后，本机环境将被冻结 {freeze_hours} 小时。
+    buttons:
+      - { label: "我已知晓", action: "ack", primary: true }
+      - { label: "查看授权范围", action: "dismiss" }
+    # 再次违规时追加的强化提示
+    repeat_body_suffix: "\n注意：你已是再次违规，距离冻结仅剩 {remain} 次。"
+
+  # ---- 冻结提示（72 小时冻结触发时）----
+  freeze:
+    title: "🔒 环境已冻结"
+    level: "critical"
+    body: |
+      因累计违规达到 {threshold} 次，本机 DualGuard-Sec 环境已被冻结。
+      冻结时长：{freeze_hours} 小时，剩余：{remain_hours} 小时。
+      冻结期间相关操作将被拦截，违规记录已加密保存于本机。
+      如属误判，请联系赛事主办方 / 管理员凭授权书申请复核，请勿尝试自行解除。
+    buttons:
+      - { label: "了解", action: "ack", primary: true }
+      - { label: "联系管理员", action: "dismiss" }
+    # 管理员解锁入口（需授权码）
+    admin_unlock:
+      label: "管理员复核解锁"
+      action: "unlock"
+      require_code: true
+
+  # ---- 篡改程序警告（audit_hash 校验失败时）----
+  tamper:
+    title: "🚨 检测到程序/策略被篡改"
+    level: "critical"
+    body: |
+      审核策略文件 {file} 的完整性校验失败，疑似被人为篡改。
+      DualGuard-Sec 已自动从备份恢复策略文件，本次事件已加密记录。
+      任何试图篡改审核策略、哈希清单、单调计数器或冻结状态以绕过监护的行为，
+      均违反使用条款，可能导致环境立即冻结。
+      如非本人操作，请立即联系管理员排查。
+    buttons:
+      - { label: "已恢复，继续", action: "ack", primary: true }
+      - { label: "立即冻结并退出", action: "dismiss" }
+    on_action: "restore"   # 与 audit.on_tamper 联动

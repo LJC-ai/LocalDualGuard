@@ -1,0 +1,13 @@
+#!/bin/sh
+# ==========================================================================
+#  dualguard-student 卸载后脚本：reload systemd；保留违规记录防绕过。
+# ==========================================================================
+set -e
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload
+fi
+
+echo "[dualguard-student] 程序已卸载。违规记录保留于 /var/lib/dualguard/student（防止绕过）。"
+
+exit 0

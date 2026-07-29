@@ -1,0 +1,16 @@
+#!/bin/sh
+# ==========================================================================
+#  dualguard-sec 卸载后脚本
+#  动作：reload systemd；保留违规记录以防"卸载-重装"绕过锁定。
+# ==========================================================================
+set -e
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload
+fi
+
+# 故意不删除 /var/lib/dualguard/sec
+# 若需彻底清理：dpkg --purge dualguard-sec 后手动 rm -rf /var/lib/dualguard/sec
+echo "[dualguard-sec] 程序已卸载。违规记录保留于 /var/lib/dualguard/sec（防止绕过）。"
+
+exit 0

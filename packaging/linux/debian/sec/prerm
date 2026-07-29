@@ -1,0 +1,14 @@
+#!/bin/sh
+# ==========================================================================
+#  dualguard-sec 卸载前脚本
+#  动作：停止并禁用 systemd 服务。
+#  故意不删除 /var/lib/dualguard/sec 下的违规记录（防绕过）。
+# ==========================================================================
+set -e
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl stop dualguard-sec.service 2>/dev/null || true
+    systemctl disable dualguard-sec.service 2>/dev/null || true
+fi
+
+exit 0

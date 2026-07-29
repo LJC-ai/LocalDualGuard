@@ -1,0 +1,19 @@
+Package: dualguard-sec
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3, python3-cryptography
+Maintainer: DualGuard Project <noreply@dualguard.local>
+Description: DualGuard-Sec dual-AI risk control platform (security edition)
+ DualGuard-Sec blocks exploit attack scripts, Winlink exploitation code,
+ and live penetration walkthroughs against real targets, emitting only
+ theoretical guidance when content is intercepted.
+ .
+ Hard guarantees:
+  * AES-encrypted violation records with HMAC tamper-proofing
+  * Audit-file hash verification on startup with auto-restore from backup
+  * Anti-system-clock-rollback via monotonic counter
+  * Single violation popup; 3 cumulative violations lock dialog for 72h
+  * Dual-layer audit: pre-audit AI gate + post-output reviewer (un-skippable)
+  * Runs as a systemd background service with auto-start on boot

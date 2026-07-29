@@ -1,0 +1,57 @@
+# ==========================================================================
+#  DualGuard-Student systemd 服务单元
+#  与 dualguard-sec.service 结构对称，仅用户组、RuntimeDirectory、端口不同，
+#  确保学生版与安全版同机并存、互不干扰、违规计数完全隔离。
+# ==========================================================================
+[Unit]
+Description=DualGuard-Student Risk Control Service
+Documentation=file:/opt/dualguard-student/README
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=dualguard
+Group=dualguard
+
+ExecStart=/usr/bin/dualguard-student --service
+
+# LLM 接入配置（按部署场景二选一，去掉注释即可）
+# 场景 A：接外部 API（如 DeepSeek）
+#Environment=DUALGUARD_LLM_BASE_URL=https://api.deepseek.com/v1
+#Environment=DUALGUARD_LLM_API_KEY=sk-xxxxxxxx
+#Environment=DUALGUARD_LLM_MODEL=deepseek-chat
+# 场景 B：接本机 Ollama（数据不出服务器，推荐生产用）
+#Environment=DUALGUARD_LLM_BASE_URL=http://localhost:11434/v1
+#Environment=DUALGUARD_LLM_API_KEY=ollama
+#Environment=DUALGUARD_LLM_MODEL=qwen2.5:7b
+# 不配置以上变量 → 自动回退到规则兜底，零依赖可用
+
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+KillSignal=SIGINT
+TimeoutStopSec=10
+
+RuntimeDirectory=dualguard-student
+RuntimeDirectoryMode=0750
+
+ReadWritePaths=/var/lib/dualguard /run/dualguard-student
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target

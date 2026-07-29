@@ -1,0 +1,48 @@
+#!/bin/sh
+# ==========================================================================
+#  dualguard-sec 安装后脚本
+#
+#  动作：
+#    1. 创建/复用低权系统用户 dualguard
+#    2. 创建运行期数据目录 /var/lib/dualguard/sec/{backup,logs}
+#    3. 设置目录属主与权限（防止绕过：仅 dualguard 可写，其他只读）
+#    4. 注册 systemd 服务 → enable --now（开机自启 + 立即启动）
+#
+#  注意：本脚本故意 *不* 清理已有违规记录，防止重装绕过锁定。
+# ==========================================================================
+set -e
+
+# --- 1. 创建专用系统用户（如不存在） ---
+if ! id -u dualguard >/dev/null 2>&1; then
+    adduser --quiet --system --no-create-home --group dualguard
+fi
+
+# --- 2. 数据目录（与 common.paths.AppPaths 约定一致） ---
+DATA_ROOT="/var/lib/dualguard"
+EDITION_DIR="$DATA_ROOT/sec"
+mkdir -p "$EDITION_DIR/backup" "$EDITION_DIR/logs"
+
+# --- 3. 权限：dualguard 属主；父目录允许 dualguard 读取兄弟版本目录
+#       （sec / student 共享 /var/lib/dualguard 父目录，但各自子目录互不可写）
+chown -R dualguard:dualguard "$EDITION_DIR"
+chmod 750 "$EDITION_DIR"
+chmod 700 "$EDITION_DIR/backup"
+# 父目录仅 dualguard 可进入
+chown dualguard:dualguard "$DATA_ROOT" 2>/dev/null || true
+chmod 750 "$DATA_ROOT" 2>/dev/null || true
+
+# --- 4. systemd 服务注册 ---
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload
+    systemctl enable dualguard-sec.service
+    # 启动前若有旧实例先停止（避免 socket 占用）
+    systemctl stop dualguard-sec.service 2>/dev/null || true
+    systemctl start dualguard-sec.service
+    echo "[dualguard-sec] 服务已启用并启动。"
+    echo "[dualguard-sec] 查询命令：dualguard-sec --query \"...\"  或  dualguard-sec --status"
+else
+    echo "[dualguard-sec] 警告：未检测到 systemd，请手动启动：dualguard-sec --service &"
+fi
+
+# DEBHELPER 占位（若后续接入 dh_installsystemd 可省略）
+exit 0

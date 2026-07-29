@@ -1,0 +1,12 @@
+#!/bin/sh
+# ==========================================================================
+#  dualguard-student 卸载前脚本：停止并禁用服务。
+# ==========================================================================
+set -e
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl stop dualguard-student.service 2>/dev/null || true
+    systemctl disable dualguard-student.service 2>/dev/null || true
+fi
+
+exit 0

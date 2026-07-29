@@ -1,0 +1,36 @@
+#!/bin/sh
+# ==========================================================================
+#  dualguard-student 安装后脚本
+#  与 sec/postinst 对称，仅数据子目录与 service 名不同。
+# ==========================================================================
+set -e
+
+# --- 1. 创建/复用低权系统用户 dualguard（与 sec 共用，避免两个用户） ---
+if ! id -u dualguard >/dev/null 2>&1; then
+    adduser --quiet --system --no-create-home --group dualguard
+fi
+
+# --- 2. 数据目录 ---
+DATA_ROOT="/var/lib/dualguard"
+EDITION_DIR="$DATA_ROOT/student"
+mkdir -p "$EDITION_DIR/backup" "$EDITION_DIR/logs"
+
+chown -R dualguard:dualguard "$EDITION_DIR"
+chmod 750 "$EDITION_DIR"
+chmod 700 "$EDITION_DIR/backup"
+chown dualguard:dualguard "$DATA_ROOT" 2>/dev/null || true
+chmod 750 "$DATA_ROOT" 2>/dev/null || true
+
+# --- 3. systemd 服务注册 ---
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload
+    systemctl enable dualguard-student.service
+    systemctl stop dualguard-student.service 2>/dev/null || true
+    systemctl start dualguard-student.service
+    echo "[dualguard-student] 服务已启用并启动。"
+    echo "[dualguard-student] 查询命令：dualguard-student --query \"...\"  或  dualguard-student --status"
+else
+    echo "[dualguard-student] 警告：未检测到 systemd，请手动启动：dualguard-student --service &"
+fi
+
+exit 0

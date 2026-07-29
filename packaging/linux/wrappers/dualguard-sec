@@ -1,0 +1,18 @@
+#!/bin/sh
+# ==========================================================================
+#  /usr/bin/dualguard-sec  -  命令行入口（deb 安装后由该 wrapper 调起 Python 模块）
+#
+#  支持的子命令：
+#    dualguard-sec                   # 交互式 REPL
+#    dualguard-sec --service         # 常驻服务模式（systemd 调用）
+#    dualguard-sec --status          # 打印风控状态后退出
+#    dualguard-sec --query "..."     # 向已运行的常驻服务发一次查询
+# ==========================================================================
+set -e
+
+# 应用代码安装位置
+APP_HOME="/opt/dualguard-sec"
+export PYTHONPATH="$APP_HOME${PYTHONPATH:+:$PYTHONPATH}"
+
+# 使用系统 Python3（deb 依赖 python3-cryptography）
+exec python3 -m dualguard_sec.main "$@"

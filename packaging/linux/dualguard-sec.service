@@ -1,0 +1,68 @@
+# ==========================================================================
+#  DualGuard-Sec systemd 服务单元
+#
+#  功能：开机自启 + 后台常驻。以专用低权用户 dualguard 运行，
+#  通过本地 Unix socket (/run/dualguard-sec/sock) 对外提供双层审核服务。
+#
+#  安装后由 postinst 自动 enable --now；
+#  对应客户端命令：dualguard-sec --query "..."  或  dualguard-sec --status
+# ==========================================================================
+[Unit]
+Description=DualGuard-Sec Risk Control Service
+Documentation=file:/opt/dualguard-sec/README
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=dualguard
+Group=dualguard
+
+# 启动命令：以常驻服务模式运行（监听 Unix socket）
+ExecStart=/usr/bin/dualguard-sec --service
+
+# LLM 接入配置（按部署场景二选一，去掉注释即可）
+# 场景 A：接外部 API（如 DeepSeek）
+#Environment=DUALGUARD_LLM_BASE_URL=https://api.deepseek.com/v1
+#Environment=DUALGUARD_LLM_API_KEY=sk-xxxxxxxx
+#Environment=DUALGUARD_LLM_MODEL=deepseek-chat
+# 场景 B：接本机 Ollama（数据不出服务器，推荐生产用）
+#Environment=DUALGUARD_LLM_BASE_URL=http://localhost:11434/v1
+#Environment=DUALGUARD_LLM_API_KEY=ollama
+#Environment=DUALGUARD_LLM_MODEL=qwen2.5:7b
+# 不配置以上变量 → 自动回退到规则兜底，零依赖可用
+
+# 失败自动重启，5 秒后重试
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+KillSignal=SIGINT
+TimeoutStopSec=10
+
+# 运行期目录（systemd 自动创建 /run/dualguard-sec 并 chown 给 dualguard）
+RuntimeDirectory=dualguard-sec
+RuntimeDirectoryMode=0750
+
+# 违规记录 / 备份 / 日志目录（由 postinst 创建并 chown）
+ReadWritePaths=/var/lib/dualguard /run/dualguard-sec
+
+# 安全加固
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+# 资源限制（按需调整）
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target

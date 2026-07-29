@@ -1,0 +1,133 @@
+# =============================================================================
+# DualGuard-Student 配置文件（学生版）
+# -----------------------------------------------------------------------------
+# 本文件由 common/config 加载，与 common/risk_engine、common/audit_hash 协同。
+# 仅当 audit_policy.json 的 SHA256 与 audit_policy.sha256 一致时，本配置才生效；
+# 若不一致，程序将自动从 backup/ 恢复策略并触发"篡改程序警告"弹窗。
+# 修改后请同步重算 audit_policy.sha256，否则会被判为篡改。
+# 文案须保持温和、引导向，禁止贬损/羞辱性表述（未成年人保护）。
+# =============================================================================
+
+app:
+  name: "DualGuard-Student"
+  edition: "student"         # 必须为 student，对应 AppPaths("student")，勿改
+  version: "1.0.0"
+  display_name: "DualGuard 学生版学习诚信护栏"
+  vendor: "DualGuard Contributors"
+  single_instance: true
+  run_mode: "tray"
+
+# -----------------------------------------------------------------------------
+# 风控引擎参数（common/risk_engine）
+# -----------------------------------------------------------------------------
+risk_engine:
+  # 学生版阈值略高，给足引导空间，避免一次失误即冻结
+  freeze_threshold: 5
+  freeze_hours: 72
+  monotonic_counter: true
+  warn_on_single: true
+  # 首次违规以"提醒"为主，权重较低；连续照搬才累计
+  weights:
+    first: 1
+    repeat: 2
+
+# -----------------------------------------------------------------------------
+# 审核策略与哈希校验（common/audit_hash）
+# -----------------------------------------------------------------------------
+audit:
+  policy_file: "audit_policy.json"
+  backup_file: "backup/audit_policy.json.bak"
+  hash_file: "audit_policy.sha256"
+  algorithm: "sha256"
+  on_tamper: "restore"
+  verify_on_start: true
+
+# -----------------------------------------------------------------------------
+# 加密存储（common/audit_storage）
+# -----------------------------------------------------------------------------
+storage:
+  db_file: "violations.enc"
+  kek_file: "kek.bin"
+  cipher: "aes-256-gcm"
+  kdf: "argon2id"
+  kdf_iterations: 64
+
+# -----------------------------------------------------------------------------
+# 前置审核 AI（common/pre_audit 可插拔接口）
+# -----------------------------------------------------------------------------
+pre_audit:
+  enabled: true
+  module: "dualguard_student.rules"
+  timeout_ms: 500
+  # 学生版仅做"学习诚信"判定，绝不生成任何答案或完整积木方案
+  policy_mode: "judge_only"
+
+# -----------------------------------------------------------------------------
+# 日志
+# -----------------------------------------------------------------------------
+logging:
+  level: "INFO"
+  rotate_mb: 10
+  keep: 7
+  # 涉及未成年人，强制脱敏
+  redact: true
+
+# -----------------------------------------------------------------------------
+# 合规横幅（常驻显示，不可关闭）
+# -----------------------------------------------------------------------------
+compliance_banner:
+  enabled: true
+  text: "本程序仅用于学习思路引导。禁止抄作业、照搬图形化编程完整积木方案；触发提示时请回到思路层面独立完成。"
+
+# =============================================================================
+# 前端弹窗提示文案（温和引导向）
+# -----------------------------------------------------------------------------
+# 三类弹窗：single_violation（单次违规警告）/ freeze（冻结提示）/ tamper（篡改程序警告）
+# 文案原则：引导独立思考，不使用"作弊者"等负面标签，保护未成年人自尊。
+# 占位符：{count} {threshold} {freeze_hours} {remain_hours} {file}
+# =============================================================================
+popups:
+  # ---- 单次违规警告 ----
+  single_violation:
+    title: "💡 学习小提示"
+    level: "warn"
+    body: |
+      这一步看起来像是直接照搬了现成方案哦。
+      建议先停下来理解思路，再自己动手实现，这样学得更扎实。
+      当前提示次数：{count} / {threshold}。
+      累计 {threshold} 次后，相关功能将暂时锁定 {freeze_hours} 小时，给你冷静思考的时间。
+    buttons:
+      - { label: "我重新想想", action: "ack", primary: true }
+      - { label: "查看学习建议", action: "dismiss" }
+    repeat_body_suffix: "\n你已经多次收到提示啦，试试把方案拆成小步，自己一步步搭起来吧～"
+
+  # ---- 冻结提示（72 小时冻结触发时）----
+  freeze:
+    title: "⏸️ 功能暂时锁定"
+    level: "critical"
+    body: |
+      因多次收到学习提示，相关功能已暂时锁定，给你一段独立思考的时间。
+      锁定时长：{freeze_hours} 小时，剩余：{remain_hours} 小时。
+      这不是惩罚，只是提醒你换个方式学习。锁定结束后可继续。
+      记录仅保存在本机，老师可凭权限复核。如认为有误，请联系老师说明。
+    buttons:
+      - { label: "好的，我休息一下", action: "ack", primary: true }
+      - { label: "联系老师", action: "dismiss" }
+    admin_unlock:
+      label: "教师复核解锁"
+      action: "unlock"
+      require_code: true
+
+  # ---- 篡改程序警告（audit_hash 校验失败时）----
+  tamper:
+    title: "🛠️ 程序文件有变化"
+    level: "critical"
+    body: |
+      学习诚信策略文件 {file} 似乎被改动过。
+      DualGuard-Student 已经自动把策略恢复成老师下发的版本，本次变化已记录。
+      改动监护程序不能帮你学到知识，反而会让功能暂时锁定。
+      如果不是你操作的，请告诉老师帮你看看。
+    buttons:
+      - { label: "已恢复，继续学习", action: "ack", primary: true }
+      - { label: "暂时锁定并退出", action: "dismiss" }
+    on_action: "restore"

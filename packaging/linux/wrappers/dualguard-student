@@ -1,0 +1,11 @@
+#!/bin/sh
+# ==========================================================================
+#  /usr/bin/dualguard-student  -  学生版命令行入口
+#  与 dualguard-sec 对称，仅 PYTHONPATH 与模块名不同。
+# ==========================================================================
+set -e
+
+APP_HOME="/opt/dualguard-student"
+export PYTHONPATH="$APP_HOME${PYTHONPATH:+:$PYTHONPATH}"
+
+exec python3 -m dualguard_student.main "$@"
