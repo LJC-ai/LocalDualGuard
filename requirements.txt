@@ -1,0 +1,8 @@
+# DualGuard 公共依赖（两套业务版本共用）
+# 仅一个外部依赖：cryptography（AES 加密 + HMAC）
+cryptography>=42.0,<46
+
+# 以下为打包期依赖，运行时不需要：
+# pyinstaller>=6.0           # Windows 打包
+# NSIS（系统安装，pip 无法提供）
+# 在 Linux 上构建 deb 需要 dpkg-deb / fakeroot（系统包）
